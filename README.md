@@ -1,3 +1,4 @@
 
-Bot for Discord Hack Week
-Made by Vex#9042
+Bot for Discord Hack Week  
+
+Made by Vex#9042  
