@@ -4,7 +4,7 @@ from PIL import Image
 import os
 
 
-EMOJI_SERVER_ID = 594361190272991234
+EMOJI_SERVER_ID = 594419428628627456
 RESOLUTION = 20
 
 client = discord.Client()
@@ -91,7 +91,6 @@ async def on_message(message):
                             # We have to create a custom emoji
 
                             custom_color = Image.new('RGB', (128, 128), color = (aR, aG, aB))
-                            custom_color.save('custom.png')
 
                             with open("custom.png", 'rb') as custom:
                                 c = await emoji_server.create_custom_emoji(name="custom" + str(column), image=custom.read())
