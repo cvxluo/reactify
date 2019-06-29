@@ -22,19 +22,8 @@ async def on_message(message):
         if command :
             type = command.split()[0]
 
-            if type == "hello" :
-                await message.channel.send("Hello World!")
-
-
-            elif type == "test" :
-                emoji_server = client.get_guild(EMOJI_SERVER_ID)
-                emojis = emoji_server.emojis
-
-                emoji = "<:" + str(emojis[0].name) + ":" + str(emojis[0].id) + ">"
-                await message.channel.send(emoji)
-                await message.channel.send(" ")
-
-
+            if type == "help" :
+                await message.channel.send("Use reactify to create images out of Discord reactions! Do !reactify with your image attached to begin the process!")
 
 
             elif type == "reactify" :
@@ -110,7 +99,7 @@ async def on_message(message):
 
 
             else :
-                await message.channel.send("Command not found, try $help for a list of commands!")
+                await message.channel.send("Command not found, try $help!")
 
 
 
