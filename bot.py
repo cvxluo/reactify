@@ -4,18 +4,19 @@ from PIL import Image
 import os
 
 
-EMOJI_SERVER_ID = 594419428628627456
-RESOLUTION = 20
-
+resolution = 20
 client = discord.Client()
+processing = False
 
 @client.event
 async def on_message(message):
+    global processing, resolution
 
     if message.author == client.user:
         return
 
 
+    # Change ! to whatever prefix you want the bot to respond to
     if message.content.startswith('!'):
         command = message.content[1:]
 
@@ -23,38 +24,72 @@ async def on_message(message):
             type = command.split()[0]
 
             if type == "help" :
-                await message.channel.send("Use reactify to create images out of Discord reactions! Do !reactify with your image attached to begin the process!")
+                await message.channel.send(
+                """
+                **Use reactify to create images out of Discord reactions! Do !reactify with your image attached to begin the process!**
+                **!reactify** - reactifies the attached image
+                **!res [new resolution]** - changes the resolution of !reactify (call with no arguments for more details)
+                """)
+
+
+            elif type == "res" :
+                if len(command.split()) > 1 :
+                    new_res = command.split()[1]
+                    try :
+                        new_res = int(new_res)
+                    except ValueError :
+                        await message.channel.send("**Please enter a number to change the resolution (!res [new resolution])**")
+                    else :
+                        if new_res > 20 or new_res < 1 :
+                            await message.channel.send("**Please enter a number between 1 and 20**")
+
+                        else :
+                            resolution = new_res
+                            await message.channel.send("**Resolution successfully changed to " + str(resolution) + "!**")
+
+
+                else :
+                    await message.channel.send("**The 'resolution' of a reactified image is limited by the maximum number of reactions that can be on a single message (20). If you wish to change the resolution, note that your image will be smaller and more inaccurate. You can do this by doing !res [new resolution].**")
 
 
             elif type == "reactify" :
-                if message.attachments :
+                if processing :
+                    await message.channel.send("**Reactify is currently prcoessing an image, please wait until it is finished!")
+
+                elif message.attachments :
+                    processing = True
+
                     url = message.attachments[0].url
                     img_name = message.attachments[0].filename
 
+                    path = "./image/" + img_name
+
+                    # Download the image onto server
                     opener = urllib.request.build_opener()
                     opener.addheaders = [('User-agent', 'Mozilla/5.0')]
                     urllib.request.install_opener(opener)
-                    urllib.request.urlretrieve(url, "./images/" + img_name)
+                    urllib.request.urlretrieve(url, path)
 
-                    path = "./images/" + img_name
                     image = Image.open(path)
 
                     width, height = image.size
                     rgb_im = image.convert('RGB')
 
 
-                    emoji_server = client.get_guild(EMOJI_SERVER_ID)
+                    emoji_server = await client.create_guild("Emoji Storage")
+                    emojis_created = 0
+
 
                     # Split into boxes
                     # Each square is scaleX width and scaleY height
 
-                    scaleX = int(width / RESOLUTION)
-                    scaleY = int(height / RESOLUTION)
+                    scaleX = int(width / resolution)
+                    scaleY = int(height / resolution)
 
-                    for row in range(RESOLUTION) :
+                    for row in range(resolution) :
                         msg = await message.channel.send(row)
 
-                        for column in range(RESOLUTION) :
+                        for column in range(resolution) :
                             # row, column is x, y of box
 
                             aR, aG, aB = 0, 0, 0
@@ -80,17 +115,24 @@ async def on_message(message):
                             # We have to create a custom emoji
 
                             custom_color = Image.new('RGB', (128, 128), color = (aR, aG, aB))
+                            custom_color.save('custom.png')
+
+                            if emojis_created >= 50 :
+                                await emoji_server.delete()
+                                emoji_server = await client.create_guild("Emoji Storage")
 
                             with open("custom.png", 'rb') as custom:
                                 c = await emoji_server.create_custom_emoji(name="custom" + str(column), image=custom.read())
+                                emojis_created += 1
                                 await msg.add_reaction(c)
-                                await c.delete()
+
 
                             os.remove("./custom.png")
 
                             #await message.channel.send(str(aR) + " " + str(aG) + " " + str(aB))
 
                     os.remove(path)
+                    processing = False
 
 
 
