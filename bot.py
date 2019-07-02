@@ -1,4 +1,5 @@
 import discord
+import asyncio
 import urllib.request
 from PIL import Image
 import os
@@ -8,9 +9,17 @@ resolution = 20
 client = discord.Client()
 processing = False
 
+cleaner_mode = False
+image_channel = None
+
+
 @client.event
 async def on_message(message):
-    global processing, resolution
+    global processing, resolution, cleaner_mode, image_channel
+    channel = message.channel
+
+    if channel == image_channel and cleaner_mode and message.author != client.user and processing :
+        await message.delete()
 
     if message.author == client.user:
         return
@@ -24,11 +33,13 @@ async def on_message(message):
             type = command.split()[0]
 
             if type == "help" :
-                await message.channel.send(
+                await channel.send(
                 """
                 **Use reactify to create images out of Discord reactions! Do !reactify with your image attached to begin the process!**
                 **!reactify** - reactifies the attached image
                 **!res [new resolution]** - changes the resolution of !reactify (call with no arguments for more details)
+                **!cleaner** - enable/disable cleaner mode (call with no arguments for more details)
+                **!cancel** - cancels reactify process on an image
                 """)
 
 
@@ -38,37 +49,97 @@ async def on_message(message):
                     try :
                         new_res = int(new_res)
                     except ValueError :
-                        await message.channel.send("**Please enter a number to change the resolution (!res [new resolution])**")
+                        await channel.send("**Please enter a number to change the resolution (!res [new resolution])**")
                     else :
                         if new_res > 20 or new_res < 1 :
-                            await message.channel.send("**Please enter a number between 1 and 20**")
+                            await channel.send("**Please enter a number between 1 and 20**")
 
                         else :
                             resolution = new_res
-                            await message.channel.send("**Resolution successfully changed to " + str(resolution) + "!**")
+                            await channel.send("**Resolution successfully changed to " + str(resolution) + "!**")
 
 
                 else :
-                    await message.channel.send("**The 'resolution' of a reactified image is limited by the maximum number of reactions that can be on a single message (20). If you wish to change the resolution, note that your image will be smaller and more inaccurate. You can do this by doing !res [new resolution].**")
+                    await channel.send("**The 'resolution' of a reactified image is limited by the maximum number of reactions that can be on a single message (20). If you wish to change the resolution, note that your image will be smaller and more inaccurate. You can do this by doing !res [new resolution].**")
+
+
+            elif type == "cleaner" :
+                await channel.send("**Cleaner mode will delete any messages that might split up a reactifying image - note it also disables canceling**")
+                msg = await channel.send("**Enable cleaner mode?**")
+
+                await msg.add_reaction('\U0001f44d')
+                await msg.add_reaction('\U0001f44e')
+
+                await asyncio.sleep(1)
+
+
+                def check (reaction, user) :
+                    return reaction.message.id == msg.id
+
+                try :
+                    reaction, user = await client.wait_for('reaction_add', timeout=10.0, check=check)
+
+                except asyncio.TimeoutError :
+                    await channel.send("**Timed out :(**")
+
+                else :
+                    if reaction.emoji == '\U0001f44d' :
+                        cleaner_mode = True
+                        await channel.send("**Cleaner mode activated!**")
+
+                    else :
+                        cleaner_mode = False
+                        await channel.send("**Cleaner mode deactivated!**")
+
+
+            elif type == "cancel" :
+                if processing :
+                    await channel.send("**Canceling...**")
+                    processing = False
+
+                else :
+                    await channel.send("**No image being processed!")
+
+
 
 
             elif type == "reactify" :
                 if processing :
-                    await message.channel.send("**Reactify is currently prcoessing an image, please wait until it is finished!")
+                    await channel.send("**Reactify is currently prcoessing an image, please wait until it is finished!**")
 
-                elif message.attachments :
+                elif message.attachments or len(command.split()) > 1:
+                    image_channel = channel
                     processing = True
 
-                    url = message.attachments[0].url
-                    img_name = message.attachments[0].filename
+                    url = None
+                    img_name = None
+
+                    if (message.attachments) :
+                        url = message.attachments[0].url
+                        img_name = message.attachments[0].filename
+
+                    else :
+                        url = str(command.split()[1])
+                        img_name = "image.png"
+
+
 
                     path = "./image/" + img_name
 
-                    # Download the image onto server
+                    # Download the image onto the server
                     opener = urllib.request.build_opener()
                     opener.addheaders = [('User-agent', 'Mozilla/5.0')]
                     urllib.request.install_opener(opener)
-                    urllib.request.urlretrieve(url, path)
+
+                    try :
+                        urllib.request.urlretrieve(url, path)
+
+                    except ValueError :
+                        await channel.send("**Please enter a valid URL!**")
+                        image_channel = None
+                        processing = False
+                        return
+
 
                     image = Image.open(path)
 
@@ -83,11 +154,13 @@ async def on_message(message):
                     # Split into boxes
                     # Each square is scaleX width and scaleY height
 
-                    scaleX = int(width / resolution)
-                    scaleY = int(height / resolution)
+                    aspect_ratio = width / height
 
-                    for row in range(resolution) :
-                        msg = await message.channel.send(row)
+                    scaleX = int(width / resolution)
+                    scaleY = int(aspect_ratio * scaleX)
+
+                    for row in range(int(height / scaleY)) :
+                        msg = await channel.send(row)
 
                         for column in range(resolution) :
                             # row, column is x, y of box
@@ -112,7 +185,7 @@ async def on_message(message):
 
 
                             # Now we have the RGB value of the square
-                            # We have to create a custom emoji
+                            # We have to create a custom emoji and upload it to the server
 
                             custom_color = Image.new('RGB', (128, 128), color = (aR, aG, aB))
                             custom_color.save('custom.png')
@@ -129,19 +202,26 @@ async def on_message(message):
 
                             os.remove("./custom.png")
 
-                            #await message.channel.send(str(aR) + " " + str(aG) + " " + str(aB))
+
+                        # If process is canceled
+                        if not processing :
+                            os.remove(path)
+                            await emoji_server.delete()
+                            return
+
 
                     os.remove(path)
+                    await emoji_server.delete()
                     processing = False
 
 
 
                 else :
-                    await message.channel.send("Please attach an image to your message!")
+                    await channel.send("**Please attach an image to your message!**")
 
 
             else :
-                await message.channel.send("Command not found, try $help!")
+                await channel.send("**Command not found, try !help!**")
 
 
 

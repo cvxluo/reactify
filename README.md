@@ -8,7 +8,7 @@ Reactify reactifies images - this Discord bot converts a given image into a seri
 
 Clone the repo, make your pipenv, and pip install -r requirements.txt, insert your token, and enjoy!
 
-Note that you must host this on your own server - otherwise, Discord server limits would break the lowkey emoji abuse
+Note that you must host this on your own server - otherwise, Discord limits would prevent the bot from functioning properly
 
 
 ## How It Works
@@ -18,13 +18,16 @@ The bot first breaks up the image into chunks, reads the average RGB value of th
 Example of this process:
 ![](example.png)
 
-This process tends to work the best with extremely pixel size images - otherwise, Discord limits prevent more emojis from being added.
+This process tends to work best with low-detail images - because Reactify takes average RBG values, small details are often lost.
+
+There can be some cutoff and stretching due to rounding.
 
 
 ## TODO
 
-- [ ] Implement cancel for a processing image
 - [ ] Take URLs in addition to attachments
+- [ ] More support for different resolutions
+- [ ] More robust cleaning methods
 
 
 ## Contributing
