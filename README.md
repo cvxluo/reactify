@@ -25,7 +25,6 @@ There can be some cutoff and stretching due to rounding.
 
 ## TODO
 
-- [ ] Take URLs in addition to attachments
 - [ ] More support for different resolutions
 - [ ] More robust cleaning methods
 
